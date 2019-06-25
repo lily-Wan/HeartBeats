@@ -152,12 +152,18 @@
 			attributes = {
 				LastUpgradeCheck = 0460;
 				ORGANIZATIONNAME = "Christian Roman";
+				TargetAttributes = {
+					2235792417D176980063F8FD = {
+						DevelopmentTeam = 4N49E442H2;
+					};
+				};
 			};
 			buildConfigurationList = 2235792017D176980063F8FD /* Build configuration list for PBXProject "HeartBeats" */;
 			compatibilityVersion = "Xcode 3.2";
 			developmentRegion = English;
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				English,
 				en,
 			);
 			mainGroup = 2235791C17D176980063F8FD;
@@ -268,10 +274,11 @@
 		2235794317D176980063F8FD /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				DEVELOPMENT_TEAM = 4N49E442H2;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "HeartBeats/HeartBeats-Prefix.pch";
 				INFOPLIST_FILE = "HeartBeats/HeartBeats-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.3;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;
 			};
@@ -280,10 +287,11 @@
 		2235794417D176980063F8FD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				DEVELOPMENT_TEAM = 4N49E442H2;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "HeartBeats/HeartBeats-Prefix.pch";
 				INFOPLIST_FILE = "HeartBeats/HeartBeats-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 9.3;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;
 			};
@@ -308,6 +316,7 @@
 				2235794417D176980063F8FD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};

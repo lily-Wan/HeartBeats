@@ -32,37 +32,64 @@
 {
     [super viewDidLoad];
     
-    imageLayer = [CALayer layer];
-    imageLayer.frame = self.view.layer.bounds;
-    imageLayer.contentsGravity = kCAGravityResizeAspectFill;
-    [self.view.layer addSublayer:imageLayer];
-    
-    [self setupAVCapture];
+//    imageLayer = [CALayer layer];
+//    imageLayer.frame = self.view.layer.bounds;
+//    imageLayer.contentsGravity = kCAGravityResizeAspectFill;
+//    [self.view.layer addSublayer:imageLayer];
+
+    UIButton *button = [[UIButton alloc] initWithFrame:CGRectMake(100, 100, 100, 30)];
+    [button addTarget:self action:@selector(flashActive) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:button];
+    button.backgroundColor = [UIColor grayColor];
+    [button setTitle:@"开始测量" forState:UIControlStateNormal];
+
+//    [self setupAVCapture];
+    [self flashActive];
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
     [self stopAVCapture];
 }
 
+- (void)configureCameraForHighestFrameRate:(AVCaptureDevice *)device
+{
+    AVCaptureDeviceFormat *bestFormat = nil;
+    AVFrameRateRange *bestFrameRateRange = nil;
+    for ( AVCaptureDeviceFormat *format in [device formats] ) {
+        for ( AVFrameRateRange *range in format.videoSupportedFrameRateRanges ) {
+            if ( range.maxFrameRate > bestFrameRateRange.maxFrameRate ) {
+                bestFormat = format;
+                bestFrameRateRange = range;
+            }
+        }
+    }
+    if ( bestFormat ) {
+        if ( [device lockForConfiguration:NULL] == YES ) {
+            device.activeFormat = bestFormat;
+            device.activeVideoMinFrameDuration = bestFrameRateRange.minFrameDuration;
+            device.activeVideoMaxFrameDuration = bestFrameRateRange.minFrameDuration;
+        }
+    }
+
+
+    device.activeVideoMinFrameDuration = CMTimeMake(1, (int)200);
+    device.activeVideoMaxFrameDuration =  CMTimeMake(1, (int)200);
+}
+
 - (void)setupAVCapture
 {
     // Get the default camera device
-	AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
-	if([device isTorchModeSupported:AVCaptureTorchModeOn]) {
-		[device lockForConfiguration:nil];
-		device.torchMode=AVCaptureTorchModeOn;
-        [device setTorchMode:AVCaptureTorchModeOn];
-		[device unlockForConfiguration];
-	}
-    
-	// Create the AVCapture Session
-	session = [AVCaptureSession new];
+    AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+
+    // Create the AVCapture Session
+    session = [AVCaptureSession new];
+
     [session beginConfiguration];
-    
-	// Create a AVCaptureDeviceInput with the camera device
-	NSError *error = nil;
-	AVCaptureDeviceInput *deviceInput = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
-	if (error) {
+
+    // Create a AVCaptureDeviceInput with the camera device
+    NSError *error = nil;
+    AVCaptureDeviceInput *deviceInput = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
+    if (error) {
         UIAlertView *alertView = [[UIAlertView alloc] initWithTitle:[NSString stringWithFormat:@"Error %d", (int)[error code]]
                                                             message:[error localizedDescription]
                                                            delegate:nil
@@ -72,12 +99,18 @@
         //[self teardownAVCapture];
         return;
     }
-    
+
     if ([session canAddInput:deviceInput])
-		[session addInput:deviceInput];
-    
-    // AVCaptureVideoDataOutput
-    
+        [session addInput:deviceInput];
+
+
+	if([device isTorchModeSupported:AVCaptureTorchModeOn]) {
+        
+        [self configureCameraForHighestFrameRate:device];
+//        [device setTorchMode:AVCaptureTorchModeOn];
+//        [device setTorchModeOnWithLevel:1.0 error:nil];
+	}
+
     AVCaptureVideoDataOutput *videoDataOutput = [AVCaptureVideoDataOutput new];
 	NSDictionary *rgbOutputSettings = [NSDictionary dictionaryWithObject:
 									   [NSNumber numberWithInt:kCMPixelFormat_32BGRA] forKey:(id)kCVPixelBufferPixelFormatTypeKey];
@@ -89,11 +122,24 @@
     if ([session canAddOutput:videoDataOutput])
 		[session addOutput:videoDataOutput];
     AVCaptureConnection* connection = [videoDataOutput connectionWithMediaType:AVMediaTypeVideo];
-    [connection setVideoMinFrameDuration:CMTimeMake(1, 10)];
     [connection setVideoOrientation:AVCaptureVideoOrientationPortrait];
-    
+
     [session commitConfiguration];
     [session startRunning];
+
+}
+
+- (void) flashActive{
+    [self setupAVCapture];
+    AVCaptureDevice * currentDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeVideo];
+    if(currentDevice.hasTorch) {
+        [currentDevice lockForConfiguration:nil];
+        BOOL torchOn = !currentDevice.isTorchActive;
+        [currentDevice setTorchModeOnWithLevel:1.0 error:nil];
+        currentDevice.torchMode = torchOn ? AVCaptureTorchModeOn : AVCaptureTorchModeOff;
+        [currentDevice unlockForConfiguration];
+    }
+
 }
 
 - (void)stopAVCapture
@@ -108,112 +154,22 @@
 {
     CVPixelBufferRef imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
     CVPixelBufferLockBaseAddress(imageBuffer, 0);
-    void *baseAddress = CVPixelBufferGetBaseAddress(imageBuffer);
     uint8_t *buf = (uint8_t *)CVPixelBufferGetBaseAddress(imageBuffer);
     size_t bytesPerRow = CVPixelBufferGetBytesPerRow(imageBuffer);
     size_t width = CVPixelBufferGetWidth(imageBuffer);
     size_t height = CVPixelBufferGetHeight(imageBuffer);
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    CGContextRef context = CGBitmapContextCreate(baseAddress, width, height, 8,
-                                                 bytesPerRow, colorSpace, kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
-    
-    float r = 0, g = 0,b = 0;
-	for(int y = 0; y < height; y++) {
-		for(int x = 0; x < width * 4; x += 4) {
-			b += buf[x];
-			g += buf[x+1];
-			r += buf[x+2];
-		}
-		buf += bytesPerRow;
-	}
-	r /= 255 * (float)(width * height);
-	g /= 255 * (float)(width * height);
-	b /= 255 * (float)(width * height);
-    
-	float h,s,v;
-	RGBtoHSV(r, g, b, &h, &s, &v);
-	static float lastH = 0;
-	float highPassValue = h - lastH;
-	lastH = h;
-	float lastHighPassValue = 0;
-	float lowPassValue = (lastHighPassValue + highPassValue) / 2;
-	lastHighPassValue = highPassValue;
-    
-    [self render:context value:[NSNumber numberWithFloat:lowPassValue]];
-    
-    CGImageRef quartzImage = CGBitmapContextCreateImage(context);
-    
-    CGContextRelease(context);
-    CGColorSpaceRelease(colorSpace);
-    
-    id renderedImage = CFBridgingRelease(quartzImage);
-    
-    dispatch_async(dispatch_get_main_queue(), ^(void) {
-        [CATransaction setDisableActions:YES];
-        [CATransaction begin];
-		imageLayer.contents = renderedImage;
-        [CATransaction commit];
-	});
-}
 
-- (void)render:(CGContextRef)context value:(NSNumber *)value
-{
-    if(!points)
-        points = [NSMutableArray new];
-    [points insertObject:value atIndex:0];
-    CGRect bounds = imageLayer.bounds;
-	while(points.count > bounds.size.width / 2)
-		[points removeLastObject];
-    if(points.count == 0)
-        return;
-    
-    CGContextSetStrokeColorWithColor(context, [UIColor whiteColor].CGColor);
-    CGContextSetLineWidth(context, 2);
-    CGContextBeginPath(context);
-    
-    CGFloat scale = [[UIScreen mainScreen] scale];
-    
-    // Flip coordinates from UIKit to Core Graphics
-    CGContextSaveGState(context);
-    CGContextTranslateCTM(context, .0f, bounds.size.height);
-    CGContextScaleCTM(context, scale, scale);
-    
-    float xpos = bounds.size.width * scale;
-    float ypos = [[points objectAtIndex:0] floatValue];
-    
-    CGContextMoveToPoint(context, xpos, ypos);
-    for(int i = 1; i < points.count; i++) {
-        xpos -= 5;
-        float ypos = [[points objectAtIndex:i] floatValue];
-        CGContextAddLineToPoint(context, xpos, bounds.size.height / 2 + ypos * bounds.size.height / 2);
+    int32_t sr = 0;
+    for(int y = 0; y < height; y++) {
+        for(int x = 0; x < width * 4; x += 4) {
+            sr+=buf[x+2];
+        }
+        buf += bytesPerRow;
     }
-    CGContextStrokePath(context);
-    
-    CGContextRestoreGState(context);
-}
+//    printf("%d\n",sr);
+    NSLog(@"%d",sr);
+    CVPixelBufferUnlockBaseAddress(imageBuffer,0);
 
-void RGBtoHSV( float r, float g, float b, float *h, float *s, float *v ) {
-	float min, max, delta;
-	min = MIN( r, MIN(g, b ));
-	max = MAX( r, MAX(g, b ));
-	*v = max;
-	delta = max - min;
-	if( max != 0 )
-		*s = delta / max;
-	else {
-		*s = 0;
-		*h = -1;
-		return;
-	}
-	if( r == max )
-		*h = ( g - b ) / delta;
-	else if( g == max )
-		*h = 2 + (b - r) / delta;
-	else
-		*h = 4 + (r - g) / delta;
-	*h *= 60;
-	if( *h < 0 )
-		*h += 360;
 }
 
 @end
